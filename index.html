@@ -16,8 +16,8 @@
     --grey-chip-ink: #4b5563;
     --accent: #2563eb;
     --accent-soft: #e0ebff;
-    --buy-bg: #fff8e6;
-    --buy-line: #f4d27a;
+    --fav: #f5a623;
+    --fav-soft: #fff3dc;
     --done: #9ca3af;
     --danger: #dc2626;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -69,6 +69,33 @@
     font-size: 13px; cursor: pointer; padding: 2px 0;
   }
   .link-btn:hover { text-decoration: underline; }
+
+  /* Favoriten-Button */
+  .fav-bar { margin-bottom: 12px; }
+  .fav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--fav-soft);
+    color: #9a6a00;
+    border: 1px solid #f0d9a6;
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, transform .08s;
+  }
+  .fav-btn:hover { background: #ffeccb; }
+  .fav-btn:active { transform: scale(.97); }
+  .fav-btn[disabled] {
+    opacity: .5;
+    cursor: default;
+    background: var(--grey-chip);
+    color: var(--muted);
+    border-color: transparent;
+  }
+  .fav-btn .star { color: var(--fav); font-size: 16px; }
 
   /* Einkaufen list */
   .buy-card {
@@ -134,12 +161,12 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
     background: var(--grey-chip);
     color: var(--grey-chip-ink);
     border: 1px solid transparent;
     border-radius: 999px;
-    padding: 9px 14px;
+    padding: 9px 13px;
     font-size: 15px;
     cursor: pointer;
     user-select: none;
@@ -152,8 +179,16 @@
     border-color: #c7dbff;
     font-weight: 600;
   }
+  .chip .star {
+    font-size: 15px;
+    line-height: 1;
+    color: #c2c2c8;
+    transition: color .12s, transform .08s;
+  }
+  .chip .star:hover { transform: scale(1.2); }
+  .chip .star.on { color: var(--fav); }
   .chip .del {
-    margin-left: 2px;
+    margin-left: 1px;
     width: 18px; height: 18px;
     border-radius: 50%;
     display: grid; place-items: center;
@@ -173,12 +208,15 @@
 <body>
 <div class="wrap">
   <h1>Einkaufsliste</h1>
-  <div class="sub">Tippe ein Item im Katalog an &rarr; es landet unter „Einkaufen".</div>
+  <div class="sub">Tippe ein Item im Katalog an &rarr; es landet unter „Einkaufen". Mit dem Stern &#9733; markierst du Favoriten.</div>
 
   <div class="section">
     <div class="section-head">
       <h2>Einkaufen</h2>
       <span class="count" id="buyCount">0</span>
+    </div>
+    <div class="fav-bar">
+      <button class="fav-btn" id="addFavs"><span class="star">&#9733;</span><span id="favBtnText">Alle Favoriten hinzufügen</span></button>
     </div>
     <div class="buy-card" id="buyCard"></div>
     <div style="margin-top:8px; text-align:right;">
@@ -196,13 +234,23 @@
       <button id="addBtn">+</button>
     </div>
     <div class="chips" id="chips"></div>
-    <div class="hint">Zum Löschen mit der Maus über ein Item fahren und auf „×" tippen.</div>
+    <div class="hint">Stern &#9733; = Favorit. Zum Löschen mit der Maus über ein Item fahren und auf „×" tippen.</div>
   </div>
 </div>
 
 <script>
 (function () {
   var KEY = "einkaufsliste_v1";
+  var SEED_KEY = "einkaufsliste_seed";
+  var SEED_VERSION = 1;
+  var DEFAULT_CATALOG = [
+    "Tofu", "Dinkelmehl", "Salz", "Pfeffer", "Öl", "Kichererbsen", "Brokkoli",
+    "Zuckerschoten", "Zwiebel", "Knoblauch", "Ingwer", "Currypaste", "Kokosmilch",
+    "Gemüsebrühe", "Limette", "Rohrzucker", "Beeren", "Erdbeeren", "Melone", "Apfel",
+    "Pfirsich", "Gurke", "Tomaten", "Paprika", "Feldsalat", "Mix Salat", "Joghurt",
+    "Quark", "Brot", "Toast", "Butter", "Käse", "Wurst", "Lachs", "Nudeln",
+    "Camembert", "Cola", "Sprite", "Fanta", "Wasser", "Oliven", "Süßer Senf Händlmeier"
+  ];
   var state = load();
 
   function load() {
@@ -213,16 +261,31 @@
         if (s && Array.isArray(s.catalog) && Array.isArray(s.onList)) return s;
       }
     } catch (e) {}
-    return { catalog: [], onList: [] }; // catalog: [{id,name}], onList: [ids]
+    return { catalog: [], onList: [] }; // catalog: [{id,name,fav}], onList: [ids]
   }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function seed() {
+    var done = 0;
+    try { done = parseInt(localStorage.getItem(SEED_KEY) || "0", 10) || 0; } catch (e) {}
+    if (done >= SEED_VERSION) return;
+    DEFAULT_CATALOG.forEach(function (n) {
+      var exists = state.catalog.some(function (c) { return c.name.toLowerCase() === n.toLowerCase(); });
+      if (!exists) state.catalog.push({ id: uid(), name: n });
+    });
+    state.catalog.sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
+    try { localStorage.setItem(SEED_KEY, String(SEED_VERSION)); } catch (e) {}
+    save();
+  }
 
   var chipsEl = document.getElementById("chips");
   var buyCardEl = document.getElementById("buyCard");
   var buyCountEl = document.getElementById("buyCount");
   var catCountEl = document.getElementById("catCount");
   var input = document.getElementById("newItem");
+  var addFavsBtn = document.getElementById("addFavs");
+  var favBtnText = document.getElementById("favBtnText");
 
   function nameOf(id) {
     var it = state.catalog.find(function (c) { return c.id === id; });
@@ -243,12 +306,27 @@
         var active = state.onList.indexOf(it.id) !== -1;
         var chip = document.createElement("div");
         chip.className = "chip" + (active ? " active" : "");
-        chip.innerHTML = "<span>" + escapeHtml(it.name) + "</span>";
         chip.title = active ? "Auf der Einkaufsliste – tippen zum Entfernen" : "Tippen, um auf die Liste zu setzen";
+
+        var star = document.createElement("span");
+        star.className = "star" + (it.fav ? " on" : "");
+        star.innerHTML = it.fav ? "&#9733;" : "&#9734;";
+        star.title = it.fav ? "Favorit entfernen" : "Als Favorit markieren";
+        star.addEventListener("click", function (e) {
+          e.stopPropagation();
+          toggleFav(it.id);
+        });
+
+        var label = document.createElement("span");
+        label.textContent = it.name;
+
+        chip.appendChild(star);
+        chip.appendChild(label);
         chip.addEventListener("click", function (e) {
-          if (e.target.classList.contains("del")) return;
+          if (e.target.classList.contains("del") || e.target.classList.contains("star")) return;
           toggle(it.id);
         });
+
         var del = document.createElement("span");
         del.className = "del";
         del.textContent = "×";
@@ -261,6 +339,11 @@
         chipsEl.appendChild(chip);
       });
     }
+
+    // Favoriten-Button
+    var favCount = state.catalog.filter(function (c) { return c.fav; }).length;
+    favBtnText.textContent = favCount > 0 ? "Alle Favoriten hinzufügen (" + favCount + ")" : "Noch keine Favoriten";
+    addFavsBtn.disabled = favCount === 0;
 
     // Einkaufen
     var ids = state.onList.filter(function (id) { return nameOf(id) !== null; });
@@ -289,6 +372,19 @@
     var i = state.onList.indexOf(id);
     if (i === -1) state.onList.push(id);
     else state.onList.splice(i, 1);
+    render();
+  }
+
+  function toggleFav(id) {
+    var it = state.catalog.find(function (c) { return c.id === id; });
+    if (it) it.fav = !it.fav;
+    render();
+  }
+
+  function addFavorites() {
+    state.catalog.forEach(function (c) {
+      if (c.fav && state.onList.indexOf(c.id) === -1) state.onList.push(c.id);
+    });
     render();
   }
 
@@ -324,7 +420,12 @@
     state.onList = [];
     render();
   });
+  addFavsBtn.addEventListener("click", function () {
+    if (addFavsBtn.disabled) return;
+    addFavorites();
+  });
 
+  seed();
   render();
 })();
 </script>
