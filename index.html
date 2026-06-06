@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Einkaufsliste</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f7f8;
+    --card: #ffffff;
+    --ink: #1c1c1e;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --grey-chip: #ececef;
+    --grey-chip-ink: #4b5563;
+    --accent: #2563eb;
+    --accent-soft: #e0ebff;
+    --buy-bg: #fff8e6;
+    --buy-line: #f4d27a;
+    --done: #9ca3af;
+    --danger: #dc2626;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 4px 0 2px;
+    font-weight: 700;
+  }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+  .section { margin-bottom: 26px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .section-head h2 {
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin: 0;
+    font-weight: 700;
+  }
+  .count {
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 9px;
+  }
+  .link-btn {
+    background: none; border: none; color: var(--accent);
+    font-size: 13px; cursor: pointer; padding: 2px 0;
+  }
+  .link-btn:hover { text-decoration: underline; }
+
+  /* Einkaufen list */
+  .buy-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .buy-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 15px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+  }
+  .buy-row:last-child { border-bottom: none; }
+  .buy-row:active { background: #fafafa; }
+  .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    flex: 0 0 auto;
+    display: grid; place-items: center;
+    color: #fff;
+    transition: background .12s;
+  }
+  .buy-name { flex: 1; font-size: 16px; }
+  .empty {
+    padding: 22px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Katalog */
+  .add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .add-row input {
+    flex: 1;
+    padding: 11px 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 15px;
+    background: var(--card);
+    color: var(--ink);
+  }
+  .add-row input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .add-row button {
+    padding: 0 18px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .add-row button:active { transform: scale(.97); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; }
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--grey-chip);
+    color: var(--grey-chip-ink);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-size: 15px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .chip:hover { background: #e2e2e6; }
+  .chip.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: #c7dbff;
+    font-weight: 600;
+  }
+  .chip .del {
+    margin-left: 2px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 14px; line-height: 1;
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity .12s, background .12s, color .12s;
+  }
+  .chip:hover .del { opacity: 1; }
+  .chip .del:hover { background: var(--danger); color: #fff; }
+  .catalog-empty {
+    color: var(--muted); font-size: 14px; padding: 6px 2px;
+  }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Einkaufsliste</h1>
+  <div class="sub">Tippe ein Item im Katalog an &rarr; es landet unter „Einkaufen".</div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Einkaufen</h2>
+      <span class="count" id="buyCount">0</span>
+    </div>
+    <div class="buy-card" id="buyCard"></div>
+    <div style="margin-top:8px; text-align:right;">
+      <button class="link-btn" id="clearBuy">Liste leeren</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>Katalog</h2>
+      <span class="count" id="catCount">0</span>
+    </div>
+    <div class="add-row">
+      <input id="newItem" type="text" placeholder="Neues Item hinzufügen…" autocomplete="off">
+      <button id="addBtn">+</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="hint">Zum Löschen mit der Maus über ein Item fahren und auf „×" tippen.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = "einkaufsliste_v1";
+  var state = load();
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && Array.isArray(s.catalog) && Array.isArray(s.onList)) return s;
+      }
+    } catch (e) {}
+    return { catalog: [], onList: [] }; // catalog: [{id,name}], onList: [ids]
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  var chipsEl = document.getElementById("chips");
+  var buyCardEl = document.getElementById("buyCard");
+  var buyCountEl = document.getElementById("buyCount");
+  var catCountEl = document.getElementById("catCount");
+  var input = document.getElementById("newItem");
+
+  function nameOf(id) {
+    var it = state.catalog.find(function (c) { return c.id === id; });
+    return it ? it.name : null;
+  }
+
+  function render() {
+    // Katalog
+    catCountEl.textContent = state.catalog.length;
+    chipsEl.innerHTML = "";
+    if (state.catalog.length === 0) {
+      var ce = document.createElement("div");
+      ce.className = "catalog-empty";
+      ce.textContent = "Noch keine Items. Füge oben dein erstes hinzu.";
+      chipsEl.appendChild(ce);
+    } else {
+      state.catalog.forEach(function (it) {
+        var active = state.onList.indexOf(it.id) !== -1;
+        var chip = document.createElement("div");
+        chip.className = "chip" + (active ? " active" : "");
+        chip.innerHTML = "<span>" + escapeHtml(it.name) + "</span>";
+        chip.title = active ? "Auf der Einkaufsliste – tippen zum Entfernen" : "Tippen, um auf die Liste zu setzen";
+        chip.addEventListener("click", function (e) {
+          if (e.target.classList.contains("del")) return;
+          toggle(it.id);
+        });
+        var del = document.createElement("span");
+        del.className = "del";
+        del.textContent = "×";
+        del.title = "Aus Katalog löschen";
+        del.addEventListener("click", function (e) {
+          e.stopPropagation();
+          removeFromCatalog(it.id);
+        });
+        chip.appendChild(del);
+        chipsEl.appendChild(chip);
+      });
+    }
+
+    // Einkaufen
+    var ids = state.onList.filter(function (id) { return nameOf(id) !== null; });
+    state.onList = ids;
+    buyCountEl.textContent = ids.length;
+    buyCardEl.innerHTML = "";
+    if (ids.length === 0) {
+      var em = document.createElement("div");
+      em.className = "empty";
+      em.textContent = "Nichts einzukaufen – tippe unten ein Item an.";
+      buyCardEl.appendChild(em);
+    } else {
+      ids.forEach(function (id) {
+        var row = document.createElement("div");
+        row.className = "buy-row";
+        row.innerHTML = '<span class="check">&#10003;</span><span class="buy-name">' + escapeHtml(nameOf(id)) + "</span>";
+        row.title = "Erledigt – tippen zum Abhaken";
+        row.addEventListener("click", function () { toggle(id); });
+        buyCardEl.appendChild(row);
+      });
+    }
+    save();
+  }
+
+  function toggle(id) {
+    var i = state.onList.indexOf(id);
+    if (i === -1) state.onList.push(id);
+    else state.onList.splice(i, 1);
+    render();
+  }
+
+  function addItem(name) {
+    name = (name || "").trim();
+    if (!name) return;
+    var exists = state.catalog.some(function (c) { return c.name.toLowerCase() === name.toLowerCase(); });
+    if (!exists) state.catalog.push({ id: uid(), name: name });
+    state.catalog.sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
+    render();
+  }
+
+  function removeFromCatalog(id) {
+    state.catalog = state.catalog.filter(function (c) { return c.id !== id; });
+    state.onList = state.onList.filter(function (x) { return x !== id; });
+    render();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  document.getElementById("addBtn").addEventListener("click", function () {
+    addItem(input.value); input.value = ""; input.focus();
+  });
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { addItem(input.value); input.value = ""; }
+  });
+  document.getElementById("clearBuy").addEventListener("click", function () {
+    if (state.onList.length === 0) return;
+    state.onList = [];
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
